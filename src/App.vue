@@ -1,26 +1,16 @@
 <template>
-  <img alt="Vue logo" src="./assets/logo.png">
-  <HelloWorld msg="Welcome to Your Vue.js App"/>
+  <myComponent msg="My test message"/>
 </template>
 
 <script>
-import HelloWorld from './components/HelloWorld.vue'
-
+import myComponent from './components/MyComponent.vue';
 export default {
   name: 'App',
   components: {
-    HelloWorld
+    myComponent
+  },
+  mount() {
+    console.log('mount App');
   }
 }
 </script>
-
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
-</style>
