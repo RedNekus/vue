@@ -18,6 +18,7 @@
               <input
                   v-model="ticker"
                   @keydown.enter = "add"
+                  @input.stop = "updateTips"
                   type="text"
                   name="wallet"
                   id="wallet"
@@ -26,17 +27,8 @@
               />
             </div>
             <div class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap">
-            <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              BTC
-            </span>
-              <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              DOGE
-            </span>
-              <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              BCH
-            </span>
-              <span class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
-              CHD
+            <span v-for="t in tips" :key="t" class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer">
+              {{ t }}
             </span>
             </div>
             <div v-if="findTicker(ticker)" class="text-sm text-red-600">Такой тикер уже добавлен</div>
@@ -156,13 +148,17 @@ export default {
       tickers: [],
       sel: null,
       graph: [],
-      coins: []
+      coins: [],
+      tips: []
     }
   },
   methods: {
     async getCoins() {
-        const query = await fetch(`https://min-api.cryptocompare.com/data/all/coinlist?summary=true`);
-        this.coins = await query.json();
+      const query = await fetch(`https://min-api.cryptocompare.com/data/all/coinlist?summary=true`);
+      let json = await query.json();
+      this.coins = Object.entries(json.Data).map(c => c[0]).filter(v => v.match(/\D+/g));
+      this.tips = this.coins.splice(0, 4);
+      console.log(this.tips);
     },
     add() {
       const currentTicker = {
@@ -208,16 +204,19 @@ export default {
     },
 
     findTicker(ticker) {
-      console.log(ticker);
       if(this.tickers.length > 0) {
         return this.tickers.findIndex(t => t.name === ticker ) > -1? true : false;
       } else {
         return false;
       }
+    },
+
+    updateTips() {
+      console.log(this.ticker);
+      this.tips = this.coins.filter(c => c.indexOf(this.ticker) === 0 ).splice(0, 4);
     }
   },
   mounted() {
-    console.log('Mounted');
     this.getCoins();
   }
 };
