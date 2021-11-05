@@ -78,7 +78,7 @@
               v-for="t in paginatedTickers"
               :key="t.name"
               @click="select(t)"
-              :class ="{'border-4': sel === t }"
+              :class ="{'border-4': selectedTicker === t }"
               class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
@@ -156,21 +156,24 @@
 </template>
 
 <script>
+//[S]OLID у сущности должна быть только одна причина для изменения!!!
 // ### Рефакторинг ###
-// [] Наличие в состоянии зависимых данных / Критичность: 5+
+// [x] Наличие в состоянии зависимых данных / Критичность: 5+
 // [] Запросы напрямую внутри компонента (???) / Критичность: 5
 // [] При удалении остается подписка на загрузку тикера / Критичность: 5
 // [] Обработка ошибок API / Критичность: 5
 // [] Количество запросов / Критичность: 4
-// [] При удалении тикера не обновляется localStorage / Критичность: 4
-// [] Одинаковый код в watch / Критичность: 3
+// [x] При удалении тикера не обновляется localStorage / Критичность: 4
+// [x] Одинаковый код в watch / Критичность: 3
 // [] localStorage и анонимные вкладки / Критичность: 3
 // [] Дизайн графика (ужасно выглядит если много цен) / Критичность: 2
 // [] Магические строки и числа (URL, задержка в мс, ключ localStorage, количество элементов на странице) / Критичность: 1
 
 // Паралельно
-// [] График "сломан" если везде одинаковые значения?
-// [] При удалении тикера остается выбор?
+// [x] График "сломан" если везде одинаковые значения?
+// [x] При удалении тикера остается выбор?
+
+import {loadTicker} from "./api";
 
 export default {
   name: 'App',
@@ -189,19 +192,29 @@ export default {
 
   created() {
     const windowData = Object.fromEntries(new URL(window.location).searchParams.entries());
-    if( windowData.filter ) {
+
+    const VALID_KEYS = ['filter', 'page'];
+
+    VALID_KEYS.forEach(key =>{
+      if(windowData[key]) {
+        this[key] = windowData[key];
+      }
+    });
+    //Object.assign(this, _.pick(windowData, VALID_KEYS))
+    //Object.assign(this, windowData)
+    /*if( windowData.filter ) {
       this.filter = windowData.filter;
     }
     if( windowData.page ) {
       this.page = windowData.page;
-    }
+    }*/
     const tickersData = localStorage.getItem("cryptonomicon-list");
+
     if(tickersData) {
       this.tickers = JSON.parse(tickersData);
-      this.tickers.forEach(ticker => {
-        this.subscribeToUpdates(ticker.name);
-      });
     }
+
+    setInterval(this.updateTickers, 5000);
   },
   // Vue кеширует результаты вызова computed !!!!
   //Возвращает данные, используемы в шаблоне и ничего не меняет???
@@ -235,6 +248,13 @@ export default {
           minValue === maxValue ? 50 : 5 + (price - minValue) / (maxValue - minValue) * 95
       );
     },
+
+    pageStateOptions() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      };
+    },
   },
 
   methods: {
@@ -245,28 +265,17 @@ export default {
         this.tips = this.coins.splice(0, 4);
     },
 
-    subscribeToUpdates(tickerName) {
-      console.log("subscribeToUpdates");
-      setInterval(async () => {
-        //We don't use this ????
-        // console.log(newTicker.name);
-        if(tickerName) {
-          const f = await fetch(
-              `https://min-api.cryptocompare.com/data/price?fsym=${tickerName}&tsyms=USD&api_key=66e21e158363f5ef11f27eed8ae4db7c3e20c12bb49b535c9602ac7836f3d20a`
-          );
-          const data = await f.json();
-          // console.log(data.USD);
-          // newTicker.price = data.USD;
-          console.log(data);
-          if(data.USD) {
-            this.tickers.find(t => t.name === tickerName).price = data.USD > 1 ? data.USD.toFixed(2) : data.USD.toPrecision(2);
-            //New syntax !!!
-            if (this.selectedTicker?.name === tickerName) {
-              this.graph.push(data.USD);
-            }
-          }
+    async updateTickers() {
+        if(!this.ticker.length) {
+          return;
         }
-      }, 3000);
+
+        const exchangeData  = await loadTicker(this.tickers.map(t => t.name));
+        this.tickers.forEach(ticker => {
+          const price = exchangeData[ticker.name.toUpperCase()];
+          ticker.price = price;
+        })
+
       this.ticker ="";
     },
 
@@ -275,18 +284,17 @@ export default {
         name: this.ticker,
         price: '-'
       }
-      this.tickers.push(currentTicker);
+      this.tickers = [...this.tickers, currentTicker]; //обновляем сслылку на массив
       this.filter = "";
 
-      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
-
       //PROMISE !!!
-      this.subscribeToUpdates(currentTicker.name);
     },
 
     handleDelete(tickerToRemove) {
+      console.log('handleDelete');
       this.tickers = this.tickers.filter(t => t != tickerToRemove);
       if(this.selectedTicker === tickerToRemove) {
+        console.log('435');
         this.selectedTicker = null;
       }
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
@@ -294,7 +302,6 @@ export default {
 
     select(ticker) {
       this.selectedTicker = ticker;
-      this.graph = [];
     },
 
     findTicker(ticker) {
@@ -312,26 +319,33 @@ export default {
   },
 
   watch: {
+    selectedTicker() {
+      this.graph = [];
+    },
+
+    tickers() {
+      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
+      //не срабатывает при добавлении!!!!
+      //console.log(newV === oldV);
+    },
     paginatedTickers() {
       if(this.paginatedTickers.length === 0 && this.page > 1) {
         this.page -= 1;
       }
     },
-    filter() {
-      this.page = 1;
-      //const {protocol, host, pathname} = window.location;
+
+    pageStateOptions(value) {
+
       window.history.pushState(
           null,
           document.title,
-          `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
+          `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
       );
     },
-    page() {
-      window.history.pushState(
-          null,
-          document.title,
-          `${window.location.pathname}?filter=${this.filter}&page=${this.page}`
-      );
+
+    filter() {
+      //const {protocol, host, pathname} = window.location;
+      this.page = 1;
     }
   },
 
