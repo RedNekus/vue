@@ -86,7 +86,7 @@
                 {{ t.name }} - USD
               </dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">
-                {{ t.price }}
+                {{ formatPrice(t.price) }}
               </dd>
             </div>
             <div class="w-full border-t border-gray-200"></div>
@@ -173,7 +173,7 @@
 // [x] График "сломан" если везде одинаковые значения?
 // [x] При удалении тикера остается выбор?
 
-import {loadTicker} from "./api";
+import {subcribeToTicker} from "./api";
 
 export default {
   name: 'App',
@@ -212,6 +212,9 @@ export default {
 
     if(tickersData) {
       this.tickers = JSON.parse(tickersData);
+      this.tickers.forEach(ticker => {
+        subcribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice));
+      })
     }
 
     setInterval(this.updateTickers, 5000);
@@ -258,6 +261,17 @@ export default {
   },
 
   methods: {
+    updateTicker(tickerName, price) {
+      this.tickers.filter(t => t.name === tickerName).forEach(t => {t.price = price})
+    },
+
+    formatPrice(price){
+      if(typeof price !== 'number') {
+        return price;
+      }
+      return price > 1? price.toFixed(2) : price.toPrecision(2);
+    },
+
     async getCoins() {
         const query = await fetch(`https://min-api.cryptocompare.com/data/all/coinlist?summary=true`);
         let json = await query.json();
@@ -266,17 +280,17 @@ export default {
     },
 
     async updateTickers() {
-        if(!this.ticker.length) {
+        /*
+        if(!this.tickers.length) {
           return;
         }
 
-        const exchangeData  = await loadTicker(this.tickers.map(t => t.name));
+        const exchangeData  = await loadTickers(this.tickers.map(t => t.name));
         this.tickers.forEach(ticker => {
           const price = exchangeData[ticker.name.toUpperCase()];
-          ticker.price = price;
-        })
-
-      this.ticker ="";
+          ticker.price = price ?? '-';
+        });
+        */
     },
 
     add() {
@@ -286,15 +300,15 @@ export default {
       }
       this.tickers = [...this.tickers, currentTicker]; //обновляем сслылку на массив
       this.filter = "";
-
-      //PROMISE !!!
+      //subcribeToTicker(this.ticker.name, () => {})
+      subcribeToTicker(this.ticker.name, (newPrice) => this.updateTicker(this.ticker.name, newPrice));
+      //PROMISE !!! Асинхронная операция, которая вызывается в один момент времени??
     },
 
     handleDelete(tickerToRemove) {
       console.log('handleDelete');
       this.tickers = this.tickers.filter(t => t != tickerToRemove);
       if(this.selectedTicker === tickerToRemove) {
-        console.log('435');
         this.selectedTicker = null;
       }
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
@@ -313,7 +327,6 @@ export default {
     },
 
     updateTips() {
-      console.log(this.ticker);
       this.tips = this.coins.filter(c => c.indexOf(this.ticker) === 0 ).splice(0, 4);
     }
   },
@@ -324,6 +337,7 @@ export default {
     },
 
     tickers() {
+      console.log('watch tickers');
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
       //не срабатывает при добавлении!!!!
       //console.log(newV === oldV);
