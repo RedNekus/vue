@@ -173,7 +173,7 @@
 // [x] График "сломан" если везде одинаковые значения?
 // [x] При удалении тикера остается выбор?
 
-import {subcribeToTicker} from "./api";
+import { subscribeToTicker, unsubscribeFromTicker } from "./api";
 
 export default {
   name: 'App',
@@ -213,11 +213,11 @@ export default {
     if(tickersData) {
       this.tickers = JSON.parse(tickersData);
       this.tickers.forEach(ticker => {
-        subcribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice));
+        subscribeToTicker(ticker.name, (newPrice) => this.updateTicker(ticker.name, newPrice));
       })
     }
 
-    setInterval(this.updateTickers, 5000);
+    //setInterval(this.updateTickers, 5000);
   },
   // Vue кеширует результаты вызова computed !!!!
   //Возвращает данные, используемы в шаблоне и ничего не меняет???
@@ -262,7 +262,12 @@ export default {
 
   methods: {
     updateTicker(tickerName, price) {
-      this.tickers.filter(t => t.name === tickerName).forEach(t => {t.price = price})
+      this.tickers.filter(t => t.name === tickerName).forEach(t => {
+        if(t === this.selectedTicker) {
+          this.graph.push(price);
+        }
+        t.price = price;
+      });
     },
 
     formatPrice(price){
@@ -279,8 +284,8 @@ export default {
         this.tips = this.coins.splice(0, 4);
     },
 
-    async updateTickers() {
-        /*
+    /*async updateTickers() {
+
         if(!this.tickers.length) {
           return;
         }
@@ -290,8 +295,8 @@ export default {
           const price = exchangeData[ticker.name.toUpperCase()];
           ticker.price = price ?? '-';
         });
-        */
-    },
+
+    },*/
 
     add() {
       const currentTicker = {
@@ -299,19 +304,20 @@ export default {
         price: '-'
       }
       this.tickers = [...this.tickers, currentTicker]; //обновляем сслылку на массив
+      this.ticker ="";
       this.filter = "";
-      //subcribeToTicker(this.ticker.name, () => {})
-      subcribeToTicker(this.ticker.name, (newPrice) => this.updateTicker(this.ticker.name, newPrice));
+      //subscribeToTicker(this.ticker.name, () => {})
+      subscribeToTicker(currentTicker.name, (newPrice) => this.updateTicker(currentTicker.name, newPrice));
       //PROMISE !!! Асинхронная операция, которая вызывается в один момент времени??
     },
 
     handleDelete(tickerToRemove) {
-      console.log('handleDelete');
       this.tickers = this.tickers.filter(t => t != tickerToRemove);
       if(this.selectedTicker === tickerToRemove) {
         this.selectedTicker = null;
       }
-      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
+      //localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
+      unsubscribeFromTicker(tickerToRemove.name);
     },
 
     select(ticker) {
@@ -337,11 +343,11 @@ export default {
     },
 
     tickers() {
-      console.log('watch tickers');
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
       //не срабатывает при добавлении!!!!
       //console.log(newV === oldV);
     },
+
     paginatedTickers() {
       if(this.paginatedTickers.length === 0 && this.page > 1) {
         this.page -= 1;
@@ -349,7 +355,6 @@ export default {
     },
 
     pageStateOptions(value) {
-
       window.history.pushState(
           null,
           document.title,
