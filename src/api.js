@@ -5,7 +5,7 @@ const AGGREGATE_INDEX = "5";
 
 socket.addEventListener('message', e => {
     const { TYPE: type, FROMSYMBOL: currency, PRICE: newPrice } = JSON.parse(e.data);
-    console.log(JSON.parse(e.data));
+    //console.log(JSON.parse(e.data));
     if(type !== AGGREGATE_INDEX || newPrice === undefined) {
         return;
     }
@@ -35,7 +35,7 @@ socket.addEventListener('message', e => {
 
 function sendToWebSocket(message) {
     const stringifiedMessage = JSON.stringify(message);
-    console.log(stringifiedMessage);
+    //console.log(stringifiedMessage);
 
     if(socket.readyState === WebSocket.OPEN) {
         socket.send(stringifiedMessage);

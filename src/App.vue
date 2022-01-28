@@ -115,12 +115,14 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div class="flex items-end border-gray-600 border-b border-l h-64"
+        ref="graph">
           <div
               v-for="(bar, idx) in normalizedGraph"
+              ref="graphElement"
               :key = "idx"
-              :style="{ height: `${bar}%`}"
-              class="bg-purple-800 border w-10"></div>
+              :style="{ height: `${bar}%`, width: `${graphWidth}px`}"
+              class="bg-purple-800 border"></div>
         </div>
         <button
             @click="selectedTicker = null"
@@ -160,13 +162,13 @@
 // ### Рефакторинг ###
 // [x] Наличие в состоянии зависимых данных / Критичность: 5+
 // [] Запросы напрямую внутри компонента (???) / Критичность: 5
-// [] При удалении остается подписка на загрузку тикера / Критичность: 5
-// [] Обработка ошибок API / Критичность: 5
+// [x] При удалении остается подписка на загрузку тикера / Критичность: 5
+// [!/дз] Обработка ошибок API / Критичность: 5
 // [] Количество запросов / Критичность: 4
 // [x] При удалении тикера не обновляется localStorage / Критичность: 4
 // [x] Одинаковый код в watch / Критичность: 3
-// [] localStorage и анонимные вкладки / Критичность: 3
-// [] Дизайн графика (ужасно выглядит если много цен) / Критичность: 2
+// [!/сам?] localStorage и анонимные вкладки / Критичность: 3
+// [x] Дизайн графика (ужасно выглядит если много цен) / Критичность: 2
 // [] Магические строки и числа (URL, задержка в мс, ключ localStorage, количество элементов на странице) / Критичность: 1
 
 // Паралельно
@@ -183,6 +185,8 @@ export default {
       tickers: [],
       selectedTicker: null,
       graph: [],
+      maxGraphElements: 1,
+      graphWidth: 40,
       page: 1,
       filter: "",
       coins: [],
@@ -261,10 +265,31 @@ export default {
   },
 
   methods: {
+    sliceGraph() {
+      if(this.graph.length > this.maxGraphElemnets) {
+        console.log(this.$refs.graphElement);
+        this.graph = this.graph.slice(this.graph.length - this.maxGraphElemnets + 1);
+      }
+    },
+
+    setMaxGraphElemnets() {
+      if(!this.$refs.graph) {
+        return;
+      }
+
+      this.maxGraphElemnets = this.$refs.graph.clientWidth / this.graphWidth;
+    },
+
+    resizeGraph() {
+      this.setMaxGraphElemnets();
+      this.sliceGraph();
+    },
+
     updateTicker(tickerName, price) {
       this.tickers.filter(t => t.name === tickerName).forEach(t => {
         if(t === this.selectedTicker) {
           this.graph.push(price);
+          this.sliceGraph();
         }
         t.price = price;
       });
@@ -322,6 +347,9 @@ export default {
 
     select(ticker) {
       this.selectedTicker = ticker;
+      this.$nextTick(() => {
+        this.setMaxGraphElemnets();
+      });
     },
 
     findTicker(ticker) {
@@ -338,8 +366,15 @@ export default {
   },
 
   watch: {
-    selectedTicker() {
+    async selectedTicker() {
       this.graph = [];
+
+      //await this.$nextTick();
+      //this.setMaxGraphElemnets();
+      /*this.$nextTick().then(() => {
+        this.setMaxGraphElemnets();
+      });*/
+      //this.$nextTick().then(his.setMaxGraphElemnets);
     },
 
     tickers() {
@@ -370,6 +405,11 @@ export default {
 
   mounted() {
     this.getCoins();
+    window.addEventListener('resize', this.resizeGraph);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('resize', this.resizeGraph);
   }
 };
 </script>
